@@ -19,7 +19,7 @@ A console-based stock market simulator written in C++ that allows users to exper
 2. Navigate to the directory containing `stock.cpp`.
 3. Compile the file:
    ```bash
-   g++ -o stock stock.cpp
+   clang++ stock.cpp -o stock
    ```
 4. Run the executable:
    ```bash
