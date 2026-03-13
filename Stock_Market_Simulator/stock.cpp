@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <cstdlib>
 #include <ctime>
+#include <fstream>
 using namespace std;
 
 struct Stock {
@@ -32,12 +33,29 @@ int holdingCount = 0;
 double balance = 50000.00;
 
 void updatePrices() {
+    ofstream logFile("transaction_logs.txt", ios::app);
+    if (logFile) {
+        logFile << "\n--- MARKET PRICE UPDATE ---" << endl;
+    }
+
     for (int i = 0; i < MAX_STOCKS; i++) {
         // Random change between -5.0% to +5.0%
         double changePercent = ((rand() % 1001) / 1000.0 * 10.0) - 5.0;
         double newPrice = stocks[i].price * (1.0 + (changePercent / 100.0));
         if (newPrice < 1.0) newPrice = 1.0;
+        
+        if (logFile) {
+            logFile << "UPDATE: " << left << setw(12) << stocks[i].name 
+                    << " | Old: Rs." << right << setw(8) << fixed << setprecision(2) << stocks[i].price
+                    << " | New: Rs." << setw(8) << fixed << setprecision(2) << newPrice 
+                    << " (" << (changePercent >= 0 ? "+" : "") << fixed << setprecision(2) << changePercent << "%)" << endl;
+        }
+
         stocks[i].price = newPrice;
+    }
+
+    if (logFile) {
+        logFile.close();
     }
 }
 
@@ -65,6 +83,21 @@ int findHolding(string name) {
             return i;
     }
     return -1;
+}
+
+void logTransaction(const string& type, const string& stockName, int qty, double price, double total, double profitLoss = 0) {
+    ofstream logFile("transaction_logs.txt", ios::app);
+    if (!logFile) return;
+    
+    logFile << type << ": " << stockName << " | Qty: " << qty 
+            << " | Price: Rs." << fixed << setprecision(2) << price 
+            << " | Total: Rs." << total;
+            
+    if (type == "SOLD") {
+        logFile << " | P/L: Rs." << (profitLoss >= 0 ? "+" : "") << profitLoss;
+    }
+    logFile << endl;
+    logFile.close();
 }
 
 void buyStock() {
@@ -122,6 +155,8 @@ void buyStock() {
     cout << "  Total Cost: Rs. " << fixed << setprecision(2) << totalCost << endl;
     cout << "  Remaining Balance: Rs. " << fixed << setprecision(2) << balance << endl;
     cout << "====================================================" << endl;
+
+    logTransaction("BOUGHT", stocks[choice - 1].name, qty, stocks[choice - 1].price, totalCost);
 }
 
 void sellStock() {
@@ -189,6 +224,8 @@ void sellStock() {
         cout << "  Loss: Rs. " << fixed << setprecision(2) << -profitLoss << endl;
     cout << "  Remaining Balance: Rs. " << fixed << setprecision(2) << balance << endl;
     cout << "====================================================" << endl;
+
+    logTransaction("SOLD", portfolio[choice - 1].name, qty, sellPrice, totalRevenue, profitLoss);
 
     if (portfolio[choice - 1].quantity == 0) {
         for (int i = choice - 1; i < holdingCount - 1; i++) {
@@ -259,9 +296,115 @@ void viewPortfolio() {
     cout << "=========================================================" << endl;
 }
 
+void savePortfolio() {
+    ofstream outFile("portfolio.txt");
+    if (!outFile) return;
+    
+    outFile << "=========================================================\n";
+    outFile << "                    FINAL PORTFOLIO\n";
+    outFile << "=========================================================\n";
+
+    if (holdingCount == 0) {
+        outFile << "  No stocks in portfolio.\n";
+    } else {
+        outFile << left << setw(15) << "Stock"
+             << setw(8) << "Qty"
+             << setw(14) << "Avg Price"
+             << setw(14) << "Cur Price"
+             << setw(14) << "Value"
+             << "P/L\n";
+        outFile << "---------------------------------------------------------\n";
+
+        double totalInvestment = 0, totalValue = 0;
+
+        for (int i = 0; i < holdingCount; i++) {
+            int stockIdx = -1;
+            for (int j = 0; j < MAX_STOCKS; j++) {
+                if (stocks[j].name == portfolio[i].name) {
+                    stockIdx = j;
+                    break;
+                }
+            }
+
+            double currentValue = stocks[stockIdx].price * portfolio[i].quantity;
+            double invested = portfolio[i].avgBuyPrice * portfolio[i].quantity;
+            double pl = currentValue - invested;
+
+            totalInvestment += invested;
+            totalValue += currentValue;
+
+            outFile << left << setw(15) << portfolio[i].name
+                 << setw(8) << portfolio[i].quantity
+                 << "Rs." << right << setw(10) << fixed << setprecision(2) << portfolio[i].avgBuyPrice
+                 << "  Rs." << setw(10) << stocks[stockIdx].price
+                 << "  Rs." << setw(10) << currentValue << "  ";
+            if (pl >= 0)
+                outFile << "+" << fixed << setprecision(2) << pl;
+            else
+                outFile << fixed << setprecision(2) << pl;
+            outFile << "\n";
+        }
+
+        outFile << "---------------------------------------------------------\n";
+        outFile << "  Total Investment : Rs. " << fixed << setprecision(2) << totalInvestment << "\n";
+        outFile << "  Current Value    : Rs. " << fixed << setprecision(2) << totalValue << "\n";
+        double netPL = totalValue - totalInvestment;
+        if (netPL >= 0)
+            outFile << "  Net Profit       : Rs. +" << fixed << setprecision(2) << netPL << "\n";
+        else
+            outFile << "  Net Loss         : Rs. " << fixed << setprecision(2) << netPL << "\n";
+    }
+
+    outFile << "=========================================================\n";
+    outFile << "  Final Cash Balance : Rs. " << fixed << setprecision(2) << balance << "\n";
+    outFile << "=========================================================\n";
+    
+    // Machine-readable data block for easy loading next time
+    outFile << "#DATA#\n";
+    outFile << balance << "\n";
+    outFile << holdingCount << "\n";
+    for (int i = 0; i < holdingCount; i++) {
+        outFile << portfolio[i].name << "\n";
+        outFile << portfolio[i].quantity << "\n";
+        outFile << portfolio[i].avgBuyPrice << "\n";
+    }
+
+    outFile.close();
+}
+
+void loadPortfolio() {
+    ifstream inFile("portfolio.txt");
+    if (!inFile) return;
+    
+    string line;
+    bool foundData = false;
+    while (getline(inFile, line)) {
+        if (line == "#DATA#") {
+            foundData = true;
+            break;
+        }
+    }
+    
+    if (foundData) {
+        inFile >> balance;
+        inFile >> holdingCount;
+        inFile.ignore(); // consume newline
+        for (int i = 0; i < holdingCount; i++) {
+            getline(inFile, portfolio[i].name);
+            inFile >> portfolio[i].quantity;
+            inFile >> portfolio[i].avgBuyPrice;
+            inFile.ignore(); // consume newline
+        }
+        cout << "Successfully loaded previous portfolio state from 'portfolio.txt'." << endl;
+    }
+    inFile.close();
+}
+
 int main() {
     srand(static_cast<unsigned int>(time(0)));
     int choice;
+    
+    loadPortfolio();
 
     cout << "====================================================" << endl;
     cout << "       STOCK MARKET SIMULATOR" << endl;
@@ -309,6 +452,8 @@ int main() {
             case 5:
                 cout << "\nThank you for using Stock Market Simulator!" << endl;
                 cout << "Final Balance: Rs. " << fixed << setprecision(2) << balance << endl;
+                savePortfolio();
+                cout << "Portfolio details saved to 'portfolio.txt'." << endl;
                 break;
             default:
                 cout << "Invalid choice! Please try again." << endl;
