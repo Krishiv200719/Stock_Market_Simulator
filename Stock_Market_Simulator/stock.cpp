@@ -400,7 +400,7 @@ void savePortfolio() {
     outFile << "=========================================================\n";
     
     outFile << "#DATA#\n";
-    outFile << "Balance: " <<balance << "\n";
+    outFile << "Balance: " << balance << "\n";
     outFile << "Holding Count: " << holdingCount << "\n";
     for (int i = 0; i < holdingCount; i++) {
         outFile << "Stock Name: " << portfolio[i].name << "\n";
@@ -425,14 +425,19 @@ void loadPortfolio() {
     }
     
     if (foundData) {
-        inFile >> balance;
-        inFile >> holdingCount;
-        inFile.ignore();
+        string t1, t2, t3;
+        inFile >> t1 >> balance;
+        inFile >> t1 >> t2 >> holdingCount;
+        inFile.ignore(1000, '\n');
         for (int i = 0; i < holdingCount; i++) {
+            inFile >> t1 >> t2;
             getline(inFile, portfolio[i].name);
-            inFile >> portfolio[i].quantity;
-            inFile >> portfolio[i].avgBuyPrice;
-            inFile.ignore();
+            if (!portfolio[i].name.empty() && portfolio[i].name[0] == ' ') {
+                portfolio[i].name = portfolio[i].name.substr(1);
+            }
+            inFile >> t1 >> portfolio[i].quantity;
+            inFile >> t1 >> t2 >> t3 >> portfolio[i].avgBuyPrice;
+            inFile.ignore(1000, '\n');
         }
         cout << "Successfully loaded previous portfolio state from 'portfolio.txt'." << endl;
     }
@@ -447,7 +452,6 @@ int main() {
 
     cout << "====================================================" << endl;
     cout << "       STOCK MARKET SIMULATOR" << endl;
-    cout << "       Starting Balance: Rs. 50,000.00" << endl;
     cout << "====================================================" << endl;
 
     do {
