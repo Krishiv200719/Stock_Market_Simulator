@@ -20,6 +20,11 @@ struct Holding {
 const int MAX_STOCKS = 5;
 const int MAX_HOLDINGS = 5;
 
+const double BROKERAGE_RATE = 0.001;
+const double EXCHANGE_FEE_RATE = 0.00005;
+const double TAX_RATE = 0.001;
+const double SLIPPAGE_MAX = 0.001;
+
 Stock stocks[MAX_STOCKS] = {
     {"Reliance", 2450.00},
     {"TCS", 3520.75},
@@ -39,7 +44,6 @@ void updatePrices() {
     }
 
     for (int i = 0; i < MAX_STOCKS; i++) {
-        // Random change between -5.0% to +5.0%
         double changePercent = ((rand() % 1001) / 1000.0 * 10.0) - 5.0;
         double newPrice = stocks[i].price * (1.0 + (changePercent / 100.0));
         if (newPrice < 1.0) newPrice = 1.0;
@@ -120,10 +124,20 @@ void buyStock() {
         return;
     }
 
-    double totalCost = stocks[choice - 1].price * qty;
+    double baseCost = stocks[choice - 1].price * qty;
+
+    double slippagePercent = (rand() % 1001) / 1000.0 * SLIPPAGE_MAX;
+    double slippageAmount = baseCost * slippagePercent;
+    double actualCostBeforeFees = baseCost + slippageAmount;
+
+    double brokerage = actualCostBeforeFees * BROKERAGE_RATE;
+    double exchangeFee = actualCostBeforeFees * EXCHANGE_FEE_RATE;
+    double tax = actualCostBeforeFees * TAX_RATE;
+
+    double totalCost = actualCostBeforeFees + brokerage + exchangeFee + tax;
 
     if (totalCost > balance) {
-        cout << "\nInsufficient balance!" << endl;
+        cout << "\nInsufficient balance! (Including fees and slippage)" << endl;
         cout << "Required: Rs. " << fixed << setprecision(2) << totalCost << endl;
         cout << "Available: Rs. " << fixed << setprecision(2) << balance << endl;
         return;
@@ -144,15 +158,25 @@ void buyStock() {
         }
         portfolio[holdingCount].name = stocks[choice - 1].name;
         portfolio[holdingCount].quantity = qty;
-        portfolio[holdingCount].avgBuyPrice = stocks[choice - 1].price;
+        portfolio[holdingCount].avgBuyPrice = totalCost / qty;
         holdingCount++;
     }
 
     cout << "\n====================================================" << endl;
     cout << "  Stock Purchased Successfully!" << endl;
     cout << "  " << stocks[choice - 1].name << " x " << qty
-         << " @ Rs. " << fixed << setprecision(2) << stocks[choice - 1].price << endl;
-    cout << "  Total Cost: Rs. " << fixed << setprecision(2) << totalCost << endl;
+         << " @ Rs. " << fixed << setprecision(2) << stocks[choice - 1].price << " (Market Price)" << endl;
+    cout << "  Base Cost     : Rs. " << fixed << setprecision(2) << baseCost << endl;
+    cout << "  Slippage      : Rs. " << fixed << setprecision(2) << slippageAmount << endl;
+    cout << "  Brokerage     : Rs. " << fixed << setprecision(2) << brokerage << endl;
+    cout << "  Exchange Fees : Rs. " << fixed << setprecision(2) << exchangeFee << endl;
+    cout << "  Tax           : Rs. " << fixed << setprecision(2) << tax << endl;
+    cout << "  Total Cost    : Rs. " << fixed << setprecision(2) << totalCost << endl;
+    if (idx != -1) {
+        cout << "  Updated Avg Price: Rs. " << fixed << setprecision(2) << portfolio[idx].avgBuyPrice << endl;
+    } else {
+        cout << "  Avg Buy Price : Rs. " << fixed << setprecision(2) << portfolio[holdingCount - 1].avgBuyPrice << endl;
+    }
     cout << "  Remaining Balance: Rs. " << fixed << setprecision(2) << balance << endl;
     cout << "====================================================" << endl;
 
@@ -207,8 +231,19 @@ void sellStock() {
     }
 
     double sellPrice = stocks[stockIdx].price;
-    double totalRevenue = sellPrice * qty;
-    double profitLoss = (sellPrice - portfolio[choice - 1].avgBuyPrice) * qty;
+    double baseRevenue = sellPrice * qty;
+
+    double slippagePercent = (rand() % 1001) / 1000.0 * SLIPPAGE_MAX;
+    double slippageAmount = baseRevenue * slippagePercent;
+    double actualRevenueBeforeFees = baseRevenue - slippageAmount;
+
+    double brokerage = actualRevenueBeforeFees * BROKERAGE_RATE;
+    double exchangeFee = actualRevenueBeforeFees * EXCHANGE_FEE_RATE;
+    double tax = actualRevenueBeforeFees * TAX_RATE;
+
+    double totalRevenue = actualRevenueBeforeFees - brokerage - exchangeFee - tax;
+
+    double profitLoss = totalRevenue - (portfolio[choice - 1].avgBuyPrice * qty);
 
     balance += totalRevenue;
     portfolio[choice - 1].quantity -= qty;
@@ -216,12 +251,17 @@ void sellStock() {
     cout << "\n====================================================" << endl;
     cout << "  Stock Sold Successfully!" << endl;
     cout << "  " << portfolio[choice - 1].name << " x " << qty
-         << " @ Rs. " << fixed << setprecision(2) << sellPrice << endl;
-    cout << "  Total Revenue: Rs. " << fixed << setprecision(2) << totalRevenue << endl;
+         << " @ Rs. " << fixed << setprecision(2) << sellPrice << " (Market Price)" << endl;
+    cout << "  Base Revenue  : Rs. " << fixed << setprecision(2) << baseRevenue << endl;
+    cout << "  Slippage      : Rs. " << fixed << setprecision(2) << slippageAmount << endl;
+    cout << "  Brokerage     : Rs. " << fixed << setprecision(2) << brokerage << endl;
+    cout << "  Exchange Fees : Rs. " << fixed << setprecision(2) << exchangeFee << endl;
+    cout << "  Tax           : Rs. " << fixed << setprecision(2) << tax << endl;
+    cout << "  Total Revenue : Rs. " << fixed << setprecision(2) << totalRevenue << endl;
     if (profitLoss >= 0)
-        cout << "  Profit: Rs. " << fixed << setprecision(2) << profitLoss << endl;
+        cout << "  Net Profit    : Rs. " << fixed << setprecision(2) << profitLoss << endl;
     else
-        cout << "  Loss: Rs. " << fixed << setprecision(2) << -profitLoss << endl;
+        cout << "  Net Loss      : Rs. " << fixed << setprecision(2) << -profitLoss << endl;
     cout << "  Remaining Balance: Rs. " << fixed << setprecision(2) << balance << endl;
     cout << "====================================================" << endl;
 
@@ -359,7 +399,6 @@ void savePortfolio() {
     outFile << "  Final Cash Balance : Rs. " << fixed << setprecision(2) << balance << "\n";
     outFile << "=========================================================\n";
     
-    // Machine-readable data block for easy loading next time
     outFile << "#DATA#\n";
     outFile << balance << "\n";
     outFile << holdingCount << "\n";
@@ -388,12 +427,12 @@ void loadPortfolio() {
     if (foundData) {
         inFile >> balance;
         inFile >> holdingCount;
-        inFile.ignore(); // consume newline
+        inFile.ignore();
         for (int i = 0; i < holdingCount; i++) {
             getline(inFile, portfolio[i].name);
             inFile >> portfolio[i].quantity;
             inFile >> portfolio[i].avgBuyPrice;
-            inFile.ignore(); // consume newline
+            inFile.ignore();
         }
         cout << "Successfully loaded previous portfolio state from 'portfolio.txt'." << endl;
     }
@@ -431,7 +470,6 @@ int main() {
             continue;
         }
 
-        // Simulate market movement on each turn
         if (choice >= 1 && choice <= 4) {
             updatePrices();
         }
