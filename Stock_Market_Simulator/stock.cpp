@@ -400,12 +400,12 @@ void savePortfolio() {
     outFile << "=========================================================\n";
     
     outFile << "#DATA#\n";
-    outFile << balance << "\n";
-    outFile << holdingCount << "\n";
+    outFile << "Balance: " <<balance << "\n";
+    outFile << "Holding Count: " << holdingCount << "\n";
     for (int i = 0; i < holdingCount; i++) {
-        outFile << portfolio[i].name << "\n";
-        outFile << portfolio[i].quantity << "\n";
-        outFile << portfolio[i].avgBuyPrice << "\n";
+        outFile << "Stock Name: " << portfolio[i].name << "\n";
+        outFile << "Quantity: " << portfolio[i].quantity << "\n";
+        outFile << "Average Buy Price: " << portfolio[i].avgBuyPrice << "\n";
     }
 
     outFile.close();
